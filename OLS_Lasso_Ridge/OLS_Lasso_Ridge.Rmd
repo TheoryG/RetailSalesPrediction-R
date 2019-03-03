@@ -1,0 +1,125 @@
+---
+title: "OLS, Ridge and Lasso Model"
+author: "Xiaorong Yuan xy2347"
+date: "2018年3月25日"
+output: html_document
+---
+
+
+```{r}
+data <- read.csv("alldata_7_lag3.csv")
+data.obs <- data[,-1]
+#divide data into training and test error 
+set.seed(309)
+train <- sample(1:nrow(data.obs), nrow(data.obs)*0.8)
+x_train <- data.obs[train, 1:11 ]
+y_train <- data.obs$Sales[train]
+x_test <- data.obs[-train, 1:11]
+y_test <- data.obs$Sales[-train]
+#export training and hold out data
+train.dataset <- data.frame(x_train, y_train)
+holdout.dataset <- data.frame(x_test, y_test)
+write.csv(train.dataset, "training_data.csv")
+write.csv(holdout.dataset, "holdout_data.csv")
+#scale training and test data
+x_train_scale <- data.frame(scale(x_train[,c(-9, -10, -11)]), x_train[, c(9, 10, 11)])
+x_test_scale <- data.frame(scale(x_test[,c(-9, -10,-11)]), x_test[, c(9, 10, 11)])
+plot_data <- data.frame(x_test, y_test)
+colnames(plot_data)[12] <- "Sales"
+write.csv(plot_data, "dataforplot.csv")
+```
+
+```{r}
+#OLS
+r_square <- function(y_fit, y_true){
+  tss <- sum((y_true - mean(y_true))^2)
+  rss <- sum((y_fit - y_true)^2)
+  r_square <- 1 - rss/tss
+return(r_square)
+}
+
+x_train_scale_f <- data.frame(scale(x_train[,c(-9, -10, -11)]), as.factor(x_train[, 9]), as.factor(x_train[, 10]), as.factor(x_train[, 11]) )
+colnames(x_train_scale_f)[9:11] <- c("c", "t", "s")
+x_test_scale_f <- data.frame(scale(x_test[,c(-9, -10, -11)]), as.factor(x_test[, 9]), as.factor(x_test[, 10]), as.factor(x_test[, 11]) )
+colnames(x_test_scale_f)[9:11] <- c("c", "t", "s")
+ols_f <- lm(y_train~., data = x_train_scale_f)
+summary(ols_f)
+plot(ols_f)
+#
+ols.pred_f <- predict(ols_f, newdata = x_test_scale_f)
+r_square(ols.pred_f, y_test) #r^2 on the test set
+
+#check colinearity
+library(DAAG)
+vif(ols_f) #GDP,CPI,PMI,IP,Payroll, Crude_Oil has VIF value greater than 10.
+
+#Stepwise
+library(leaps)
+step.ols <- regsubsets(x = x_train_scale, y = y_train, method = "forward", all.best = TRUE)
+
+summary(step.ols)
+result <- summary(step.ols)        
+step.ols_result <- data.frame(result$outmat,RSS=result$rss,R2=result$rsq)
+step.ols_result # the sequence of adding variables
+
+#Stepwise add variabe and check VIF in each step
+step1 <- lm(y_train~ CPI,data = x_train_scale_f )
+vif(step1)
+step2 <- lm(y_train~ CPI + Crude_Oil, data = x_train_scale_f )
+vif(step2)
+step3 <- lm(y_train~ CPI + Crude_Oil + c, data = x_train_scale_f )
+vif(step3)
+abs(coef(step3))
+step4 <- lm(y_train~ CPI + Crude_Oil + c + PMI, data = x_train_scale_f )
+vif(step4) # VIF value of CPI and PMI is greater than 10. So we stop adding variable PMI
+
+summary(step3)
+
+ols.pred_step <- predict(step3, newdata = x_test_scale_f)
+r_square(ols.pred_step, y_test) #r^2 on the test set
+RMSE_ols <- sqrt(mean((y_test - ols.pred_step)^2))
+RMSE_ols
+```
+
+```{r}
+library(glmnet)
+lasso.fit<-glmnet(as.matrix(x_train_scale), y_train, alpha = 1, standardize = FALSE)
+#use cross-validation to choose parameter lambda
+set.seed(1)
+lambda_range <- seq(exp(-16), exp(8))
+lasso.cv<-cv.glmnet(as.matrix(x_train_scale), y_train, alpha = 1, standardize = FALSE, lambda = lambda_range)
+plot(lasso.cv)
+bestlam_lasso <- lasso.cv$lambda.1se
+bestlam_lasso
+best.lasso.fit<-glmnet(as.matrix(x_train_scale), y_train, alpha = 1, standardize = FALSE, lambda = bestlam_lasso)
+#apply trained model to test data
+lasso.pred <- predict(lasso.fit, s = bestlam_lasso,newx = as.matrix(x_test_scale))
+#compute r-square
+r_square_lasso <- r_square(lasso.pred, y_test)
+r_square_lasso
+RMSE_lasso <- sqrt(mean((y_test - lasso.pred)^2))
+RMSE_lasso
+```
+
+```{r}
+#ridge regression model
+ridge.fit<-glmnet(as.matrix(x_train_scale), y_train, alpha = 0, standardize = FALSE)
+plot(ridge.fit, xvar = "lambda", label = TRUE)
+#use cross-validation to choose best parameter lambda
+set.seed(10)
+ridge.cv<-cv.glmnet(as.matrix(x_train_scale), y_train, alpha = 0, standardize = FALSE, lambda = lambda_range)
+plot(ridge.cv)
+bestlam_ridge <- ridge.cv$lambda.1se
+#apply trained ridge model to test data
+ridge.pred <- predict(ridge.fit ,s = bestlam_ridge ,newx = as.matrix(x_test_scale))
+#compute r-square of test result
+r_square_ridge <- r_square(ridge.pred, y_test)
+r_square_ridge
+RMSE_ridge <- sqrt(mean((y_test - ridge.pred)^2))
+RMSE_ridge
+```
+
+
+
+
+

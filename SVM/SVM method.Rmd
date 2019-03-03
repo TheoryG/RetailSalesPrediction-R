@@ -1,0 +1,91 @@
+---
+title: "svm_method"
+author: "Jianfeng Zhang"
+date: "March 28, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data <- read.csv("C:/Users/jianf/Desktop/Project/alldata7.csv")
+
+### 1. linear-SVM regression
+### Tune svm with 5-fold cross validation
+tc <- tune.control(cross = 5)
+set.seed(1)
+tuneResult_linear <- tune.svm(Sales ~ ., data = train, cost = seq(0.001,10, 0.01), kernel = "linear",
+                              tunecontrol = tc)
+tuneResult_linear
+plot(tuneResult_linear)
+
+### MSE of train dataset
+linear_predict_train <- predict(tuneResult_linear$best.model, train[,-12])
+mean( (linear_predict_train - train$Sales)^2 )
+
+### MSE of test dataset
+linear_predict_test <- predict(tuneResult_linear$best.model, test[,-12])
+mean( (linear_predict_test - test$Sales)^2)
+
+
+### Train R-square
+linear_rss_train <- sum(  (linear_predict_train - train$Sales)^2 )
+linear_sst_train <- sum( ( train$Sales - mean(train$Sales))^2)
+r_square_linear_train <- 1- (linear_rss_train / linear_sst_train)
+r_square_linear_train
+
+
+### Test R-square
+linear_ssr <- sum(  (linear_predict_test - mean(test$Sales))^2 )
+linear_sst <- sum( ( test$Sales - mean(test$Sales))^2)
+r_square_linear <- linear_ssr / linear_sst
+r_square_linear
+
+### RMSE value of test dataset
+RMSE_linear_test <- sqrt(mean( (linear_predict_test - test$Sales)^2))
+RMSE_linear_test
+
+```
+
+```{R}
+### 2. Non-Linear Support Vector Regression
+set.seed(1)
+tuneResult_radial <- tune.svm(Sales ~ ., data = train, cost = seq(0.001, 10, 0.1),gamma = seq(0.001, 5, 0.1), kernel = "radial",tunecontrol = tc)
+tuneResult_radial
+plot(tuneResult_radial)
+
+### MSE of train dataset
+radial_predict_train <- predict(tuneResult_radial$best.model, train[,-12])
+mean( (radial_predict_train - train$Sales)^2 )
+
+### MSE of test dataset
+radial_predict_test <- predict(tuneResult_radial$best.model, test[,-12])
+mean( (radial_predict_test - test$Sales)^2)
+
+### R-squared of train data set
+radial_rss_train <- sum(  (radial_predict_train - train$Sales)^2 )
+radial_sst_train <- sum( ( train$Sales - mean(train$Sales))^2)
+r_square_radial_train <- 1- ( radial_rss_train / radial_sst_train)
+r_square_radial_train
+
+### R-squared of test data set
+radial_rss <- sum(  (radial_predict_test - test$Sales)^2 )
+radial_sst <- sum( ( test$Sales - mean(test$Sales))^2)
+r_square <-  1 - (radial_rss / radial_sst)
+r_square
+
+RMSE_radial_test <- sqrt( mean( (radial_predict_test - test$Sales)^2) )
+RMSE_radial_test
+
+### Importance of variables
+library(rminer)
+M <- fit(Sales~., data=train, model="svm", kpar=list(sigma=0.10), C=2)
+svm.imp <- Importance(M, data=train)
+svm.imp$imp
+rank(-svm.imp$imp)
+
+```
+
+

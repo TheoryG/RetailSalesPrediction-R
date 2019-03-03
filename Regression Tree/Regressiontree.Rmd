@@ -1,0 +1,51 @@
+---
+title: "Untitled"
+author: "Ziwei Guo"
+date: "2018/03/29"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+clipboard <-read.table("clipboard",header=T)
+set.seed(1)
+samp_20_proj<-sample(nrow(clipboard),.2*nrow(clipboard))
+data_train<-clipboard[-samp_20_proj,]
+data_test_x<-clipboard[,-12]
+data_test_y<-clipboard[,12]
+
+library(rpart)
+tree_project<-rpart(Sales~.,data=data_train,method='anova',control=rpart.control(maxdepth=8,minbucket=5,minsplit=5,cp=0.01))
+printcp(tree_project)
+treefit<-prune(tree_project, cp=tree_project$cptable[which.min(tree_project$cptable[,'xerror'])])
+printcp(treefit)
+plot(treefit,uniform=T, branch=1, margin=0.1, main="Regression Tree")
+text(treefit,use.n=T, col="blue")
+
+#cross-validation
+library(caret)
+split=0.80
+train_control <- trainControl(method="cv", number=5)
+treefit2<- train(Sales~PMI+GDP+CPI, data=data_train, trControl=train_control, method="rpart",parms=list(method='anova'))
+print(treefit2)
+treefit2$finalModel
+library(rpart.plot)
+rpart.plot(treefit2$finalModel)
+
+##test
+proj_pred<-predict(treefit2,data_test_x)
+(rss_pred<- mean((data_test_y-proj_pred)^2))
+rsquare<-function(true,predicted){
+  sse<-sum((predicted-true)^2)
+  sst<-sum((true-mean(true))^2)
+  rsq<-1-sse/sst
+}
+Rsquare<-rsquare(data_test_y,proj_pred)
+
+```
+

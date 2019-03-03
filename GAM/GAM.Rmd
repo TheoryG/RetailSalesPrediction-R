@@ -1,0 +1,50 @@
+---
+title: "GAM model"
+author: "Shiyu Liu"
+date: "2018Äê3ÔÂ28ÈÕ"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(splines)
+library(gam)
+data<-read.csv(choose.files())
+
+data<-data[,-1]
+#pairs(Sales~.,data=data, main="Simple Scatterplot Matrix")
+
+para<-numeric(12)
+for(i in 1:12){
+  plot(data$Sales~data[,i], main =colnames(data)[i])
+  fit_ss=smooth.spline(data[train,i],data[train, 13], cv = TRUE)
+  para[i]<-fit_ss$df
+}
+
+fit_GDP=smooth.splinene (age ,yaga , cv = TRUE)
+train<-sample(1:309, 0.8*309)
+s_fit<-gam(Sales~s(GDP,2.04)+s(CPI, 2.200)+s(Interest_Rate,2.027881)+s(PMI, 2.0308)+s(Unemployment, 2)+s(Crude_Oil, 12.8)+s(IP, 2.1)+s(Payroll, 2.58)+as.factor(Christmas)+as.factor(Thx)+as.factor(Super), data =data[train,])
+p<-predict.Gam(s_fit, newdata = data[-train,])
+
+
+ss_fit<-gam(Sales~s(GDP,2.04)+s(CPI, 2.200)+s(Interest_Rate,2.027881)+s(PMI, 2.0308)+s(Unemployment, 2)+s(Crude_Oil, 12.8)+s(IP, 2.1)+s(Payroll, 2.58)+as.factor(Christmas)+as.factor(Thx)+as.factor(Super), data =data)
+p<-predict.Gam(s_fit, newdata = data[-train,1:12])
+pp<-predict.Gam(s_fit, newdata = data[,1:12])
+ppp<-predict.Gam(ss_fit, newdata = data[,1:11])
+MSE<-mean((p-data[-train,])^2)
+s_fit
+plot(s_fit)
+
+
+plot(1:309, ppp, col = "red4", type = "l")
+lines(1:309, data[, 12], col = "blue4")
+
+
+plot(1:62, p, col = "blue4", type = "l", lwd = 2, xlab = "time", ylab = "Sales")
+lines(1:62, data[-train, 12], col = "red3", lwd =2)
+
+legend("bottomright", legend = c("TRUE", "PREDICTED"), col = c("red3", "blue4"), lwd = c(2,2))
+```
